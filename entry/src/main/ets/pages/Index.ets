@@ -1,6 +1,9 @@
-import { router, display } from '@kit.ArkUI';
+import { router, display, promptAction } from '@kit.ArkUI';
 import { ApiService } from '../network/ApiService';
-import { AlbumViewModel, JmAlbumInfo, JmPromoteSection, SearchResultData, IAlbumViewModelJSON } from '../models/Album';
+import { AlbumViewModel, JmAlbumInfo, JmPromoteSection, SearchResultData, IAlbumViewModelJSON,
+  CommentInfo, CommentPageData, parseCommentRaw,
+  COMMENT_MODE_ALL, COMMENT_MODE_MANHUA, COMMENT_MODE_CHAT, COMMENT_MODE_NAME_MAP,
+} from '../models/Album';
 import { CacheManager } from '../common/CacheManager';
 import {
   CATEGORY_ALL, CATEGORY_DOUJIN, CATEGORY_SINGLE, CATEGORY_SHORT,
@@ -12,8 +15,14 @@ import {
 } from '../common/Constants';
 import { HdsTabs, HdsTabsController, HdsTabsFloatingStyle, hdsMaterial } from '@kit.UIDesignKit';
 import { MenuItem, buildMenuPopup, RouteColumn, buildRouteMenu, buildMenuOverlay } from '../common/MenuPopup';
+import { CommentItemComponent } from '../common/CommentItem';
 
 interface OrderItem {
+  key: string;
+  label: string;
+}
+
+interface ForumModeItem {
   key: string;
   label: string;
 }
@@ -137,30 +146,6 @@ struct HomePage {
     }
     .alignItems(HorizontalAlign.Start)
     .onClick(() => this.onAlbumClick(album))
-  }
-}
-
-// ═══════════════════════════════════════════
-// 讨论区（占位）
-// ═══════════════════════════════════════════
-@Component
-struct ForumPage {
-  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
-
-  build() {
-    Column() {
-      Column() {
-        Text('暂未实现')
-          .fontSize(16)
-          .fontColor('#999999')
-      }
-      .width('100%')
-      .layoutWeight(1)
-      .justifyContent(FlexAlign.Center)
-    }
-    .width('100%')
-    .height('100%')
-    .backgroundColor('#FFFFFF')
   }
 }
 
@@ -589,6 +574,200 @@ struct CategoryPage {
       offsetX: 0,
       offsetY: 2
     })
+  }
+}
+
+// ═══════════════════════════════════════════
+// 讨论区
+// ═══════════════════════════════════════════
+@Component
+struct ForumPage {
+  @State comments: CommentInfo[] = [];
+  @State isLoading: boolean = true;
+  @State isLoadingMore: boolean = false;
+  @State currentPage: number = 1;
+  @State totalComments: number = 0;
+  @State hasMore: boolean = true;
+  @State currentMode: string = COMMENT_MODE_ALL;
+  @StorageProp('topSafeHeight') topSafeHeight: number = 0;
+  @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
+  private apiService: ApiService = new ApiService();
+
+  private modes: ForumModeItem[] = [
+    { key: COMMENT_MODE_ALL, label: COMMENT_MODE_NAME_MAP[COMMENT_MODE_ALL] } as ForumModeItem,
+    { key: COMMENT_MODE_MANHUA, label: COMMENT_MODE_NAME_MAP[COMMENT_MODE_MANHUA] } as ForumModeItem,
+    { key: COMMENT_MODE_CHAT, label: COMMENT_MODE_NAME_MAP[COMMENT_MODE_CHAT] } as ForumModeItem,
+  ];
+
+  async aboutToAppear(): Promise<void> {
+    await this.loadComments();
+  }
+
+  async loadComments(): Promise<void> {
+    this.isLoading = true;
+    try {
+      let data: CommentPageData = await this.apiService.getComments(this.currentMode, '', this.currentPage);
+      this.totalComments = data.total;
+      this.comments = (data.list || []).map((raw) => parseCommentRaw(raw));
+      this.hasMore = this.comments.length < this.totalComments;
+    } catch (err) {
+      console.error('[ForumPage] loadComments error:', JSON.stringify(err));
+    } finally {
+      this.isLoading = false;
+    }
+  }
+
+  async loadMoreComments(): Promise<void> {
+    if (!this.hasMore || this.isLoadingMore) return;
+    this.isLoadingMore = true;
+    this.currentPage++;
+    try {
+      let data: CommentPageData = await this.apiService.getComments(this.currentMode, '', this.currentPage);
+      let newComments = (data.list || []).map((raw) => parseCommentRaw(raw));
+      this.comments = this.comments.concat(newComments);
+      this.hasMore = this.comments.length < this.totalComments;
+    } catch (err) {
+      console.error('[ForumPage] loadMoreComments error:', JSON.stringify(err));
+      this.currentPage--;
+    } finally {
+      this.isLoadingMore = false;
+    }
+  }
+
+  async onModeChange(mode: string): Promise<void> {
+    if (this.currentMode === mode) return;
+    this.currentMode = mode;
+    this.currentPage = 1;
+    this.comments = [];
+    this.hasMore = true;
+    await this.loadComments();
+  }
+
+  build() {
+    Column() {
+      // ── 模式筛选栏 ──
+      Row() {
+        ForEach(this.modes, (item: ForumModeItem) => {
+          Text(item.label)
+            .fontSize(13)
+            .fontColor(this.currentMode === item.key ? '#FF5A5F' : '#666666')
+            .fontWeight(this.currentMode === item.key ? FontWeight.Bold : FontWeight.Normal)
+            .padding({ left: 14, right: 14, top: 6, bottom: 6 })
+            .backgroundColor(this.currentMode === item.key ? '#FFF0F0' : '#F5F5F5')
+            .borderRadius(14)
+            .margin({ right: 8 })
+            .onClick(() => this.onModeChange(item.key))
+        })
+
+        Blank()
+
+        Text(`${this.totalComments} 条`)
+          .fontSize(12)
+          .fontColor('#999999')
+      }
+      .width('100%')
+      .padding({ left: 16, right: 16, top: 8, bottom: 8 })
+      .backgroundColor('#FFFFFF')
+
+      // ── 评论列表 ──
+      if (this.isLoading) {
+        Column() {
+          LoadingProgress()
+            .width(40)
+            .height(40)
+            .color('#FF5A5F')
+          Text('加载中...')
+            .fontSize(14)
+            .fontColor('#999999')
+            .margin({ top: 12 })
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else if (this.comments.length === 0) {
+        Column() {
+          Text('暂无评论')
+            .fontSize(16)
+            .fontColor('#999999')
+        }
+        .width('100%')
+        .layoutWeight(1)
+        .justifyContent(FlexAlign.Center)
+      } else {
+        Scroll() {
+          Column() {
+            ForEach(this.comments, (comment: CommentInfo, index: number) => {
+              CommentItemComponent({
+                comment: comment,
+                index: index + 1,
+                onSendReply: this.handleSendReply,
+              })
+                .margin({ top: 8, left: 12, right: 12 })
+            }, (comment: CommentInfo) => comment.id)
+
+            if (this.isLoadingMore) {
+              Row() {
+                LoadingProgress()
+                  .width(24)
+                  .height(24)
+                  .color('#FF5A5F')
+                Text('加载更多...')
+                  .fontSize(13)
+                  .fontColor('#999999')
+                  .margin({ left: 8 })
+              }
+              .width('100%')
+              .justifyContent(FlexAlign.Center)
+              .padding({ top: 16, bottom: 16 })
+            } else if (this.hasMore) {
+              Text('上拉加载更多')
+                .fontSize(13)
+                .fontColor('#CCCCCC')
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding({ top: 16, bottom: 16 })
+            } else {
+              Text('没有更多了')
+                .fontSize(13)
+                .fontColor('#CCCCCC')
+                .width('100%')
+                .textAlign(TextAlign.Center)
+                .padding({ top: 16, bottom: 16 })
+            }
+          }
+          .width('100%')
+        }
+        .layoutWeight(1)
+        .width('100%')
+        .scrollBar(BarState.Off)
+        .onReachEnd(() => {
+          if (!this.isLoadingMore && this.hasMore) {
+            this.loadMoreComments();
+          }
+        })
+      }
+    }
+    .width('100%')
+    .height('100%')
+    .padding({ top: this.topSafeHeight + 52, bottom: 80 })
+    .backgroundColor('#F5F5F5')
+  }
+
+  async handleSendReply(commentId: string, albumId: string, text: string): Promise<void> {
+    if (!this.apiService.isLoggedIn()) {
+      try {
+        await promptAction.showToast({ message: '请先登录后再回复', duration: 2000 });
+      } catch (e) {
+        console.error('[ForumPage] showToast error:', JSON.stringify(e));
+      }
+      return;
+    }
+    try {
+      let msg = await this.apiService.sendComment(albumId, text, commentId);
+      console.info('[ForumPage] 回复成功:', msg);
+    } catch (err) {
+      console.error('[ForumPage] 回复失败:', JSON.stringify(err));
+    }
   }
 }
 

@@ -111,6 +111,13 @@ struct AlbumDetailPage {
     router.back();
   }
 
+  parseAuthorList(author: string | string[]): string[] {
+    if (Array.isArray(author)) {
+      return author;
+    }
+    return author ? [author] : [];
+  }
+
   formatAuthor(author: string | string[]): string {
     if (Array.isArray(author)) {
       return author.join(', ');
@@ -160,10 +167,30 @@ struct AlbumDetailPage {
                   .textOverflow({ overflow: TextOverflow.Ellipsis })
                   .lineHeight(24)
 
-                Text(`作者: ${this.formatAuthor(this.album.author)}`)
-                  .fontSize(14)
-                  .fontColor('#666666')
-                  .margin({ top: 8 })
+                Flex({ wrap: FlexWrap.Wrap }) {
+                  Text('作者: ')
+                    .fontSize(14)
+                    .fontColor('#666666')
+                  ForEach(this.parseAuthorList(this.album?.author ?? ''), (name: string, idx: number) => {
+                    Text(name)
+                      .fontSize(14)
+                      .fontColor('#4A90D9')
+                      .onClick(() => {
+                        if (name) {
+                          router.pushUrl({
+                            url: 'pages/SearchPage',
+                            params: { keyword: name }
+                          });
+                        }
+                      })
+                    if (idx < (this.parseAuthorList(this.album?.author ?? '').length - 1)) {
+                      Text(', ')
+                        .fontSize(14)
+                        .fontColor('#666666')
+                    }
+                  }, (name: string, idx: number) => `${name}_${idx}`)
+                }
+                .margin({ top: 8 })
 
                 Row() {
                   if (this.album.category && typeof this.album.category === 'object') {
@@ -191,6 +218,11 @@ struct AlbumDetailPage {
                     .margin({ right: 16 })
 
                   Text(`❤ ${this.album.likes}`)
+                    .fontSize(12)
+                    .fontColor('#999999')
+                    .margin({ right: 16 })
+
+                  Text(`💬 ${this.album.comment_total || 0}`)
                     .fontSize(12)
                     .fontColor('#999999')
                 }
@@ -238,6 +270,14 @@ struct AlbumDetailPage {
                     .borderRadius(4)
                     .border({ width: 0.5, color: '#FFD4D4' })
                     .margin({ right: 8, bottom: 8 })
+                    .onClick(() => {
+                      if (tag) {
+                        router.pushUrl({
+                          url: 'pages/SearchPage',
+                          params: { keyword: tag }
+                        });
+                      }
+                    })
                 })
               }
               .width('100%')
@@ -263,18 +303,38 @@ struct AlbumDetailPage {
               .padding({ left: 16, right: 16, bottom: 8 })
             }
 
-            // ── 开始阅读按钮 ──
+            // ── 开始阅读 + 评论 按钮 ──
             if (this.chapters.length > 0) {
-              Button('开始阅读')
-                .width('100%')
-                .height(48)
-                .fontSize(16)
-                .fontWeight(FontWeight.Bold)
-                .fontColor('#FFFFFF')
-                .backgroundColor('#FF5A5F')
-                .borderRadius(24)
-                .margin({ left: 16, right: 16, top: 16 })
-                .onClick(() => this.onChapterClick(this.chapters[0]))
+              Row() {
+                Button('开始阅读')
+                  .layoutWeight(1)
+                  .height(48)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#FFFFFF')
+                  .backgroundColor('#FF5A5F')
+                  .borderRadius(24)
+                  .onClick(() => this.onChapterClick(this.chapters[0]))
+
+                Button('评论')
+                  .height(48)
+                  .fontSize(16)
+                  .fontWeight(FontWeight.Bold)
+                  .fontColor('#FF5A5F')
+                  .backgroundColor('#FFFFFF')
+                  .borderRadius(24)
+                  .border({ width: 1, color: '#FF5A5F' })
+                  .padding({ left: 24, right: 24 })
+                  .margin({ left: 12 })
+                  .onClick(() => {
+                    router.pushUrl({
+                      url: 'pages/AlbumCommentPage',
+                      params: { albumId: this.albumId, albumName: this.albumName }
+                    });
+                  })
+              }
+              .width('100%')
+              .padding({ left: 16, right: 16, top: 16 })
             }
 
             // ── 章节列表标题 ──

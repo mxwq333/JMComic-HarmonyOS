@@ -13,6 +13,8 @@ import {
   API_FAVORITE,
   API_FAVORITE_FOLDER,
   API_LOGIN,
+  API_FORUM,
+  API_COMMENT,
   PAGE_SIZE_SEARCH,
   PAGE_SIZE_FAVORITE,
   IMAGE_SUFFIX_LIST,
@@ -34,6 +36,9 @@ import {
   FavoriteFolderType,
   JmUserData,
   UserSession,
+  CommentPageData,
+  CommentInfoRaw,
+  SendCommentData,
 } from '../models/Album';
 
 /**
@@ -508,6 +513,79 @@ export class ApiService {
   logout(): void {
     this.userSession.logout();
     console.info('[ApiService] logout');
+  }
+
+  // ─── 评论系统 ───
+
+  /**
+   * 获取评论列表
+   * 对应 QT: GetCommentReq2 — GET /forum?mode=manhua&aid=xxx&page=N
+   *
+   * @param mode 评论模式: all(所有)/manhua(漫画)/chat(闲聊)
+   * @param albumId 漫画ID (可选，指定漫画时传入)
+   * @param page 页码 (从1开始)
+   * @returns 评论列表和总数
+   */
+  async getComments(mode: string = 'manhua', albumId: string = '', page: number = 1): Promise<CommentPageData> {
+    let ts = CryptoUtils.timestamp();
+    let headers = await this.buildTokenHeaders(ts);
+
+    let queryParams: Record<string, string> = {};
+    queryParams['mode'] = mode;
+    if (albumId) {
+      queryParams['aid'] = albumId;
+    }
+    queryParams['page'] = page.toString();
+    let queryString = ApiService.buildFormBody(queryParams);
+
+    let path = `${API_FORUM}?${queryString}`;
+    let respStr = await this.requestApi(path, 'GET', null, headers);
+
+    // 评论接口也是加密响应
+    let resp = await this.decryptResponse<CommentPageData>(respStr, ts);
+    if (resp.code !== 200) {
+      throw new Error(resp.message || '获取评论失败');
+    }
+    return resp.data as CommentPageData;
+  }
+
+  /**
+   * 获取我的评论
+   * 对应 QT: GetMyCommentReq2 — GET /forum?mode=undefined&uid=xxx&page=N
+   *
+   * @param uid 用户ID
+   * @param page 页码
+   */
+  async getMyComments(uid: string, page: number = 1): Promise<CommentPageData> {
+    return this.getComments('undefined', '', page);
+  }
+
+  /**
+   * 发送评论
+   * 对应 QT: SendCommentReq2 — POST /comment {comment, aid, comment_id}
+   *
+   * @param albumId 漫画ID
+   * @param comment 评论内容
+   * @param commentId 父评论ID (可选，回复时传入)
+   */
+  async sendComment(albumId: string, comment: string, commentId: string = ''): Promise<string> {
+    let ts = CryptoUtils.timestamp();
+    let headers = await this.buildTokenHeaders(ts);
+
+    let bodyParams: Record<string, string> = {};
+    bodyParams['comment'] = comment;
+    bodyParams['aid'] = albumId;
+    if (commentId) {
+      bodyParams['comment_id'] = commentId;
+    }
+    let body = ApiService.buildFormBody(bodyParams);
+
+    let respStr = await this.requestApi(API_COMMENT, 'POST', body, headers);
+    let resp = await this.decryptResponse<SendCommentData>(respStr, ts);
+    if (resp.code !== 200) {
+      throw new Error(resp.message || '发送评论失败');
+    }
+    return (resp.data as SendCommentData).msg || '评论成功';
   }
 
   // ─── 辅助方法 ───

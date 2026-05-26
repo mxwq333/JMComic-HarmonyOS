@@ -6,6 +6,7 @@
     "pages/ImageViewerPage",
     "pages/FavoritePage",
     "pages/LoginPage",
-    "pages/DownloadPage"
+    "pages/DownloadPage",
+    "pages/AlbumCommentPage"
   ]
 }

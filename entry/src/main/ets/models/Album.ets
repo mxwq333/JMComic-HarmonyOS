@@ -277,6 +277,107 @@ export class UserSession {
   }
 }
 
+// ── 评论系统模型 ──
+
+/** 评论信息（对应 Python CommentInfo） */
+export interface CommentInfo {
+  id: string;              // CID
+  uid: string;             // UID
+  name: string;            // username
+  level: string;           // expinfo.level
+  title: string;           // expinfo.level_name
+  date: string;            // addtime
+  content: string;         // 评论内容
+  headUrl: string;         // 头像路径 (/media/users/xxx)
+  like: number;            // likes
+  linkBookId: string;      // AID 关联漫画
+  linkBookName: string;    // 关联漫画名称
+  subComments: CommentInfo[];  // 子评论列表
+}
+
+/** 评论列表 API 响应 data */
+export interface CommentPageData {
+  list: CommentInfoRaw[];
+  total: number;
+}
+
+/** 评论原始数据 (API返回结构) */
+export interface CommentInfoRaw {
+  CID: string;
+  UID: string;
+  username: string;
+  content: string;
+  likes: number;
+  addtime: string;
+  photo: string;
+  name: string;            // 关联漫画名称
+  AID: string;             // 关联漫画ID
+  expinfo: CommentExpInfo;
+  replys: CommentInfoRaw[];
+}
+
+/** 用户经验信息 */
+export interface CommentExpInfo {
+  level: string;
+  level_name: string;
+}
+
+/** 发送评论 API 响应 data */
+export interface SendCommentData {
+  msg: string;
+}
+
+/** 评论模式 */
+export const COMMENT_MODE_ALL: string = 'all';
+export const COMMENT_MODE_MANHUA: string = 'manhua';
+export const COMMENT_MODE_CHAT: string = 'chat';
+export const COMMENT_MODE_MY: string = 'undefined';
+
+/** 评论模式名称映射 */
+export const COMMENT_MODE_NAME_MAP: Record<string, string> = {
+  'all': '所有',
+  'manhua': '漫画',
+  'chat': '闲聊',
+};
+
+/**
+ * 去除 HTML 标签，提取纯文本内容
+ */
+function stripHtmlTags(html: string): string {
+  return html.replace(/<[^>]*>/g, '').trim();
+}
+
+/**
+ * 解析评论原始数据为 CommentInfo
+ * 对应 Python: ToolUtil.ParseBookComment()
+ */
+export function parseCommentRaw(raw: CommentInfoRaw): CommentInfo {
+  let info: CommentInfo = {
+    id: raw.CID || '',
+    uid: raw.UID || '',
+    name: raw.username || '',
+    level: raw.expinfo?.level || '',
+    title: raw.expinfo?.level_name || '',
+    date: raw.addtime || '',
+    content: stripHtmlTags(raw.content || ''),
+    headUrl: '',
+    like: raw.likes || 0,
+    linkBookId: raw.AID || '',
+    linkBookName: raw.name || '',
+    subComments: [],
+  };
+  // 头像处理：排除默认头像
+  let photo = raw.photo || '';
+  if (photo !== 'nopic-Male.gif' && photo !== 'nopic-Female.gif' && photo.length > 0) {
+    info.headUrl = '/media/users/' + photo;
+  }
+  // 解析子评论
+  if (raw.replys && raw.replys.length > 0) {
+    info.subComments = raw.replys.map((r: CommentInfoRaw) => parseCommentRaw(r));
+  }
+  return info;
+}
+
 // ── 下载系统模型 ──
 
 /** 下载状态枚举 */

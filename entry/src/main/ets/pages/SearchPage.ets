@@ -21,6 +21,11 @@ struct SearchPage {
   async aboutToAppear(): Promise<void> {
     this.cache = await CacheManager.getInstance();
     this.searchHistory = this.cache.getSearchHistory();
+    let params = router.getParams() as Record<string, string>;
+    if (params && params.keyword) {
+      this.keyword = params.keyword;
+      this.doSearch();
+    }
   }
 
   async doSearch(isNewSearch: boolean = true): Promise<void> {

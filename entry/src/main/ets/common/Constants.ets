@@ -75,6 +75,8 @@ export const API_FAVORITE: string = '/favorite';
 export const API_FAVORITE_FOLDER: string = '/favorite_folder';
 export const API_SETTING: string = '/setting';
 export const API_LOGIN: string = '/login';
+export const API_FORUM: string = '/forum';
+export const API_COMMENT: string = '/comment';
 
 // HTTP Headers
 export const APP_HEADERS_TEMPLATE: Record<string, string> = {
