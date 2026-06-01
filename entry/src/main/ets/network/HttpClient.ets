@@ -3,9 +3,107 @@ import { APP_HEADERS_TEMPLATE, DEFAULT_RETRY_TIMES } from '../common/Constants';
 
 /**
  * HTTP 网络请求客户端
- * 封装 @ohos.net.http，提供重试机制
+ * 封装 @ohos.net.http，提供重试机制和 Cookie 管理
  */
 export class HttpClient {
+  // 全局 Cookie 存储（模拟 Session）
+  private static globalCookies: Map<string, string> = new Map();
+
+  /**
+   * 设置全局 Cookie
+   * @param name Cookie 名称
+   * @param value Cookie 值
+   */
+  static setCookie(name: string, value: string): void {
+    HttpClient.globalCookies.set(name, value);
+    console.info(`[HttpClient] Set cookie: ${name}=${value.substring(0, 20)}...`);
+  }
+
+  /**
+   * 强制更新 Cookie（用于需要主动更新的场景）
+   * @param name Cookie 名称
+   * @param value Cookie 值
+   */
+  static forceSetCookie(name: string, value: string): void {
+    HttpClient.globalCookies.set(name, value);
+    console.info(`[HttpClient] Force update cookie: ${name}=${value.substring(0, 20)}...`);
+  }
+
+  /**
+   * 清除所有 Cookies（用于登出或重新初始化）
+   */
+  static clearAllCookies(): void {
+    HttpClient.globalCookies.clear();
+    console.info('[HttpClient] All cookies cleared');
+  }
+
+  /**
+   * 获取所有 Cookies 字符串（用于 Cookie header）
+   * @returns Cookie 字符串，格式: "name1=value1; name2=value2"
+   */
+  static getCookiesString(): string {
+    let cookies: string[] = [];
+    // 确保重要cookie优先添加
+    let importantCookies = ['AVS', 'ipcountry', 'ipm5', '__cflb'];
+    
+    // 先添加重要的cookies（按固定顺序）
+    for (let key of importantCookies) {
+      if (HttpClient.globalCookies.has(key)) {
+        cookies.push(`${key}=${HttpClient.globalCookies.get(key)}`);
+      }
+    }
+    
+    // 再添加其他cookies
+    HttpClient.globalCookies.forEach((value, key) => {
+      if (!importantCookies.includes(key)) {
+        cookies.push(`${key}=${value}`);
+      }
+    });
+    
+    let result = cookies.join('; ');
+    console.info(`[HttpClient] getCookiesString: ${result.length > 0 ? result.substring(0, 100) + '...' : '(empty)'}, count=${HttpClient.globalCookies.size}`);
+    return result;
+  }
+
+  /**
+   * 从响应头中解析并保存 Cookies（合并模式，不会覆盖已有的重要 cookies）
+   * @param headers 响应头
+   */
+  static parseAndSaveCookies(headers: Record<string, string | string[]>): void {
+    let setCookieHeaders = headers['set-cookie'];
+    if (!setCookieHeaders) {
+      return;
+    }
+
+    // set-cookie 可能是数组或字符串
+    let cookieStrings: string[] = [];
+    if (Array.isArray(setCookieHeaders)) {
+      cookieStrings = setCookieHeaders as string[];
+    } else {
+      cookieStrings = [setCookieHeaders as string];
+    }
+
+    for (let cookieStr of cookieStrings) {
+      // 解析 "name=value; Path=/; ..." 格式
+      let firstSemicolon = cookieStr.indexOf(';');
+      let cookiePart = firstSemicolon > 0 ? cookieStr.substring(0, firstSemicolon) : cookieStr;
+      let equalIndex = cookiePart.indexOf('=');
+      if (equalIndex > 0) {
+        let name = cookiePart.substring(0, equalIndex).trim();
+        let value = cookiePart.substring(equalIndex + 1).trim();
+        if (name && value) {
+          // 关键修复：只有当该 cookie 不存在时才设置，或者允许更新某些特定的 cookie
+          // 对于重要的认证 cookies（如 AVS），保留已有的值
+          if (!HttpClient.globalCookies.has(name)) {
+            HttpClient.setCookie(name, value);
+          } else {
+            // 如果已存在，记录日志但不覆盖（避免错误的 cookies 覆盖正确的）
+            console.info(`[HttpClient] Cookie ${name} already exists, keeping existing value`);
+          }
+        }
+      }
+    }
+  }
   /**
    * 发起 GET 请求
    * @param url 完整 URL
@@ -80,6 +178,13 @@ export class HttpClient {
     // 合并请求头
     let allHeaders: Record<string, string> = HttpClient.mergeHeaders(APP_HEADERS_TEMPLATE, extraHeaders);
 
+    // 添加 Cookie header（如果有 cookies）
+    let cookiesStr = HttpClient.getCookiesString();
+    if (cookiesStr.length > 0) {
+      allHeaders['Cookie'] = cookiesStr;
+      console.info(`[HttpClient] Sending cookies: ${cookiesStr.substring(0, 50)}...`);
+    }
+
     if (method === http.RequestMethod.POST && body) {
       allHeaders['Content-Type'] = allHeaders['Content-Type'] || 'application/x-www-form-urlencoded';
     }
@@ -94,7 +199,9 @@ export class HttpClient {
         readTimeout: 30000,
       });
 
+      // 只在成功响应时保存 Cookies，避免错误响应覆盖正确的 cookies
       if (response.responseCode === 200) {
+        HttpClient.parseAndSaveCookies(response.header as Record<string, string | string[]>);
         return response.result as string;
       }
 

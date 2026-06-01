@@ -13,7 +13,7 @@ export struct CommentItemComponent {
   index: number = 0;
   onSendReply: (commentId: string, albumId: string, text: string) => void = () => {};
   @State replyText: string = '';
-  private apiService: ApiService = new ApiService();
+  private apiService: ApiService = ApiService.getInstance();
 
   buildHeadUrl(): string {
     if (!this.comment.headUrl) {

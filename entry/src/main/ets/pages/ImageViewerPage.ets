@@ -42,7 +42,7 @@ struct ImageViewerPage {
   private albumName: string = '';
   private chapters: ChapterInfo[] = [];
   private currentChapterIndex: number = 0;
-  private apiService: ApiService = new ApiService();
+  private apiService: ApiService = ApiService.getInstance();
   private cache: CacheManager | null = null;
   private totalImages: number = 0;
   private listScroller: Scroller = new Scroller();

@@ -31,7 +31,7 @@ export const JM_CDN_IMAGE_URL_TEMPLATE: string = PROT + 'cdn-msp.{domain}/media/
 export const APP_TOKEN_SECRET: string = '18comicAPP';
 export const APP_TOKEN_SECRET_2: string = '18comicAPPContent';
 export const APP_DATA_SECRET: string = '185Hcomic3PAPP7R';
-export const APP_VERSION: string = '1.7.9';
+export const APP_VERSION: string = '2.0.20';
 
 // Scramble 阈值
 export const SCRAMBLE_220980: number = 220980;

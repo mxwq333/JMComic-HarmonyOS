@@ -15,7 +15,7 @@ struct SearchPage {
   @State searchHistory: string[] = [];
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
-  private apiService: ApiService = new ApiService();
+  private apiService: ApiService = ApiService.getInstance();
   private cache: CacheManager | null = null;
   private isTablet: boolean = (display.getDefaultDisplaySync().width / display.getDefaultDisplaySync().densityPixels) >= 600;
 

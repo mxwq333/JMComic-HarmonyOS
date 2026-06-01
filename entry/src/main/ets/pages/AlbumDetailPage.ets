@@ -1,4 +1,4 @@
-import { router } from '@kit.ArkUI';
+import { router, promptAction } from '@kit.ArkUI';
 import { ApiService } from '../network/ApiService';
 import {
   JmAlbumDetail,
@@ -8,7 +8,8 @@ import {
   JmRelatedWork,
   AlbumViewModel,
   JmAlbumSeries,
-  CategoryBean
+  CategoryBean,
+  FavoriteAlbumItem
 } from '../models/Album';
 
 interface RouterParams {
@@ -34,10 +35,14 @@ struct AlbumDetailPage {
   @State isLoading: boolean = true;
   @State albumName: string = '详情';
   @State isChapterExpanded: boolean = false;
+  @State isFavorited: boolean = false;
+  @State favLoading: boolean = false;
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
+  @StorageProp('isLoggedIn') isLoggedIn: boolean = false;
   private albumId: number = 0;
-  private apiService: ApiService = new ApiService();
+  private apiService: ApiService = ApiService.getInstance();
+  private favCheckedId: number = -1; // 已经做过二次校验的 albumId，避免重复请求
 
   aboutToAppear(): void {
     let params = router.getParams() as RouterParams;
@@ -46,6 +51,13 @@ struct AlbumDetailPage {
       this.albumName = params.albumName || '详情';
     }
     this.loadDetail();
+  }
+
+  onPageShow(): void {
+    // 每次页面显示时重新校验收藏状态（从别的页面返回时）
+    if (this.isLoggedIn && this.album) {
+      this.verifyFavorited();
+    }
   }
 
   async loadDetail(): Promise<void> {
@@ -79,12 +91,40 @@ struct AlbumDetailPage {
             this.chapters = [vm];
           }
           this.albumName = this.album.name;
+          this.isFavorited = this.album.is_favorite === true;
+          // 已登录时，用收藏列表做二次确认（详情API的is_favorite不可靠）
+          if (this.isLoggedIn && !this.isFavorited) {
+            this.verifyFavorited();
+          }
         }
       }
     } catch (err) {
       console.error('loadDetail error:', JSON.stringify(err));
     } finally {
       this.isLoading = false;
+    }
+  }
+
+  /**
+   * 二次校验收藏状态：跳过详情API不可靠的 is_favorite 字段，
+   * 直接查询收藏列表确认当前漫画是否已收藏
+   */
+  async verifyFavorited(): Promise<void> {
+    if (this.favCheckedId === this.albumId) return;
+    this.favCheckedId = this.albumId;
+    try {
+      // 查第一页全部收藏，判断当前album是否在列表中
+      let resp = await this.apiService.getFavorites(1, '0');
+      if (resp.code === 200 && resp.data && resp.data.list) {
+        let found = resp.data.list.some((item: FavoriteAlbumItem) => {
+          return String(item.id) === String(this.albumId);
+        });
+        if (found) {
+          this.isFavorited = true;
+        }
+      }
+    } catch (err) {
+      console.error('[AlbumDetailPage] verifyFavorited error:', JSON.stringify(err));
     }
   }
 
@@ -105,6 +145,29 @@ struct AlbumDetailPage {
         currentChapterIndex: currentIndex >= 0 ? currentIndex : 0
       }
     });
+  }
+
+  async onToggleFavorite(): Promise<void> {
+    if (this.favLoading) return;
+    if (!this.apiService.isLoggedIn()) {
+      try {
+        await promptAction.showToast({ message: '请先登录后再收藏', duration: 2000 });
+      } catch (e) {
+        console.error('[AlbumDetailPage] showToast error:', JSON.stringify(e));
+      }
+      return;
+    }
+    this.favLoading = true;
+    try {
+      let result = await this.apiService.toggleFavorite(this.albumId.toString());
+      if (result.status === 'ok') {
+        this.isFavorited = !this.isFavorited;
+      }
+    } catch (err) {
+      console.error('[AlbumDetailPage] toggleFavorite error:', JSON.stringify(err));
+    } finally {
+      this.favLoading = false;
+    }
   }
 
   onBack(): void {
@@ -210,9 +273,29 @@ struct AlbumDetailPage {
                 Text(`JM${this.album.id}`)
                   .fontSize(14)
                   .fontColor('#666666')
+
+                // 收藏按钮
+                Button({ type: ButtonType.Normal }) {
+                  Row() {
+                    Image($r('sys.symbol.heart'))
+                      .width(16)
+                      .height(16)
+                      .fillColor('#FF5A5F')
+                    Text(this.isFavorited ? '已收藏' : '收藏')
+                      .fontSize(13)
+                      .fontColor('#FF5A5F')
+                      .margin({ left: 4 })
+                  }
+                }
+                .backgroundColor(this.isFavorited ? '#FFD6D8' : '#FFF0F0')
+                .borderRadius(16)
+                .height(32)
+                .padding({ left: 16, right: 16 })
+                .margin({ top: 8 })
+                .onClick(() => this.onToggleFavorite())
               }
               .layoutWeight(1)
-              .height(165)
+              .height(185)
               .margin({ left: 16 })
               .alignItems(HorizontalAlign.Start)
             }

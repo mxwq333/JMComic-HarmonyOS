@@ -26,7 +26,7 @@ struct AlbumCommentPage {
   @StorageProp('topSafeHeight') topSafeHeight: number = 0;
   @StorageProp('bottomSafeHeight') bottomSafeHeight: number = 0;
   private albumId: number = 0;
-  private apiService: ApiService = new ApiService();
+  private apiService: ApiService = ApiService.getInstance();
 
   aboutToAppear(): void {
     let params = router.getParams() as CommentPageParams;
@@ -38,7 +38,8 @@ struct AlbumCommentPage {
   }
 
   aboutToDisappear(): void {
-    this.apiService.destroy();
+    // 不要销毁单例，让其他组件继续使用
+    // this.apiService.destroy();
   }
 
   async loadComments(): Promise<void> {

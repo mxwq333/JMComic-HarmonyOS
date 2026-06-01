@@ -7,11 +7,11 @@
         "material": {
           "certpath": "C:\\Users\\28483\\.ohos\\config\\default_JMComic_YWPxfgpYttwYWW_cvP5Upp6zE5vLo6FkHCTMPh7GFwk=.cer",
           "keyAlias": "debugKey",
-          "keyPassword": "0000001BBB57397250C63CB02644FD694103F86EF887CF45145B49C4B9972678889779D6A62300D1896CA6",
+          "keyPassword": "0000001BDD0C85C1ECE3E452865CDFD055D1472BAF0A9B8FDDA8A97663E3597ED3DB4B653EA591A6EECA02",
           "profile": "C:\\Users\\28483\\.ohos\\config\\default_JMComic_YWPxfgpYttwYWW_cvP5Upp6zE5vLo6FkHCTMPh7GFwk=.p7b",
           "signAlg": "SHA256withECDSA",
           "storeFile": "C:\\Users\\28483\\.ohos\\config\\default_JMComic_YWPxfgpYttwYWW_cvP5Upp6zE5vLo6FkHCTMPh7GFwk=.p12",
-          "storePassword": "0000001B9409AE63CEF4FA32921719244524487275D4A211E756A9B1FCE2EA449C611DA718072FA3D51CEC"
+          "storePassword": "0000001BAB99E475AA5F294A80A6B04A8096F20F295FA80943E4C5E894ACF4E1C2807C598BE298AEC3BFD2"
         }
       }
     ],

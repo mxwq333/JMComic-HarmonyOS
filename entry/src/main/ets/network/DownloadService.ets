@@ -6,6 +6,7 @@ import {
   DownloadStatus,
   JmImageInfo,
   IDownloadTaskJSON,
+  PictureData,
 } from '../models/Album';
 import { APP_HEADERS_IMAGE } from '../common/Constants';
 import { CacheManager } from '../common/CacheManager';
@@ -173,12 +174,12 @@ export class DownloadService {
 
   /** 实际执行下载一个章节的所有图片 */
   private async executeDownload(task: DownloadTask): Promise<void> {
-    let apiService = new ApiService();
+    let apiService = ApiService.getInstance();
     try {
       // 1. 获取图片列表
-      let pictureData = await apiService.getChapterPictures(task.photoId, task.scrambleId);
-      let images = pictureData.pictures.images;
-      let scrambleId = pictureData.pictures.scramble_id;
+      let pictureData: PictureData = await apiService.getChapterPictures(task.photoId, task.scrambleId);
+      let images: JmImageInfo[] = pictureData.pictures.images;
+      let scrambleId: number = pictureData.pictures.scramble_id;
       task.totalImages = images.length;
       task.completedImages = 0;
       this.notifyUpdate();
@@ -195,7 +196,7 @@ export class DownloadService {
           break;
         }
 
-        let img = images[i];
+        let img: JmImageInfo = images[i];
         task.currentImageName = img.img_name;
         this.notifyUpdate();
 
@@ -208,8 +209,9 @@ export class DownloadService {
           // 单张失败不中断整体，继续下一张
         }
       }
-    } finally {
-      apiService.destroy();
+    } catch (err) {
+      console.error(`[DownloadService] download task failed: ${(err as Error).message}`);
+      // 不销毁单例，让其他组件继续使用
     }
   }
 

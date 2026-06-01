@@ -12,6 +12,7 @@ import {
   API_CATEGORIES_FILTER,
   API_FAVORITE,
   API_FAVORITE_FOLDER,
+  API_SETTING,
   API_LOGIN,
   API_FORUM,
   API_COMMENT,
@@ -21,6 +22,7 @@ import {
   APP_HEADERS_IMAGE,
   APP_TOKEN_SECRET,
   APP_TOKEN_SECRET_2,
+  APP_VERSION,
   DEFAULT_RETRY_TIMES,
 } from '../common/Constants';
 import {
@@ -52,13 +54,90 @@ import {
  * - 后台定期探活恢复不可达域名
  */
 export class ApiService {
+  private static instance: ApiService | null = null;
   private domainManager: DomainManager;
   private userSession: UserSession = new UserSession();
+  private isInitialized: boolean = false;
+  private initialCookies: string = '';
 
-  constructor() {
+  /**
+   * 获取 ApiService 单例实例
+   */
+  static getInstance(): ApiService {
+    if (!ApiService.instance) {
+      ApiService.instance = new ApiService();
+    }
+    return ApiService.instance;
+  }
+
+  /**
+   * 销毁单例实例（用于退出登录等场景）
+   */
+  static destroyInstance(): void {
+    if (ApiService.instance) {
+      ApiService.instance.destroy();
+      ApiService.instance = null;
+    }
+  }
+
+  private constructor() {
     this.domainManager = new DomainManager(DOMAIN_API_LIST, DOMAIN_IMAGE_LIST);
     // 启动后台定期复探
     this.domainManager.startPeriodicProbe();
+    // 自动初始化（获取初始 Cookies）
+    this.initialize().catch((err: Error) => {
+      console.error(`[ApiService] 构造函数中初始化失败: ${err.message}`);
+    });
+  }
+
+  /**
+   * 初始化 API 服务（获取初始 Cookies）
+   * 对应 Python: JmApiClient.ensure_have_cookies() -> setting()
+   * 
+   * 移动端 API 要求必须携带 cookies，否则会返回 401 Unauthorized
+   * 必须在登录或其他 API 调用前执行此方法
+   */
+  async initialize(): Promise<void> {
+    console.info(`[ApiService] initialize() called, isInitialized=${this.isInitialized}`);
+    
+    // 如果已经成功初始化过，直接返回
+    if (this.isInitialized && this.initialCookies.length > 0) {
+      console.info('[ApiService] 已成功初始化，跳过');
+      return;
+    }
+
+    try {
+      console.info('[ApiService] 开始初始化，获取初始 Cookies...');
+      let ts = CryptoUtils.timestamp();
+      let headers = await this.buildTokenHeaders(ts);
+      
+      console.info(`[ApiService] 调用 /setting 接口, ts=${ts}, headers=${JSON.stringify(headers)}`);
+      // 调用 /setting 接口获取初始 cookies
+      let respStr = await this.requestApi(API_SETTING, 'GET', null, headers);
+      
+      console.info(`[ApiService] /setting 响应长度: ${respStr.length}, 前100字符: ${respStr.substring(0, 100)}`);
+      // setting 响应也是加密的，需要解密
+      let resp = await this.decryptResponse<Record<string, Object>>(respStr, ts);
+      
+      console.info(`[ApiService] /setting 解密后 code=${resp.code}, message=${resp.message}`);
+      
+      if (resp.code === 200) {
+        console.info('[ApiService] ✓ 初始化成功，已获取服务器配置');
+        // 保存初始 cookies（从 HttpClient 的全局存储中获取）
+        this.initialCookies = HttpClient.getCookiesString();
+        console.info(`[ApiService] 当前 cookies: ${this.initialCookies}`);
+        this.isInitialized = true;
+      } else {
+        console.warn(`[ApiService] ⚠ setting 接口返回非 200: ${resp.code}, message: ${resp.message}`);
+        // 即使 setting 失败，也标记为已初始化，允许继续尝试登录
+        this.isInitialized = true;
+      }
+    } catch (err) {
+      console.error(`[ApiService] ✗ 初始化失败: ${(err as Error).message}`);
+      console.error(`[ApiService] 错误堆栈: ${(err as Error).stack}`);
+      // 初始化失败时不设置 isInitialized，允许下次重试
+      // this.isInitialized = true;  // ← 注释掉这行
+    }
   }
 
   // ─── 域名管理 ───
@@ -158,7 +237,18 @@ export class ApiService {
         lastErr = err as Error;
         // 请求失败，报告域名失败
         this.domainManager.reportApiFailure(domain);
-        console.warn(`[ApiService] ✗ ${domain}${path} (attempt ${attempt + 1}/${maxDomainSwitches}): ${lastErr.message}`);
+        
+        // 检查是否是 HTTP 401 错误（认证失败）
+        if (lastErr.message.includes('HTTP 401')) {
+          console.error(`[ApiService] ✗ ${domain}${path}: 认证失败 (HTTP 401)`);
+          // 如果是登录请求，直接抛出友好提示
+          if (path === API_LOGIN) {
+            throw new Error('账号或密码错误，请检查后重试');
+          }
+          // 其他请求的 401，继续尝试下一个域名
+        } else {
+          console.warn(`[ApiService] ✗ ${domain}${path} (attempt ${attempt + 1}/${maxDomainSwitches}): ${lastErr.message}`);
+        }
 
         if (attempt < maxDomainSwitches - 1) {
           await HttpClient.sleep(500);
@@ -166,7 +256,19 @@ export class ApiService {
       }
     }
 
-    throw lastErr || new Error(`所有 API 域名请求均失败: ${path}`);
+    // 所有域名都失败了
+    if (lastErr) {
+      // 如果是登录请求，提供友好提示
+      if (path === API_LOGIN) {
+        if (lastErr.message.includes('HTTP 401')) {
+          throw new Error('账号或密码错误，请检查后重试');
+        } else if (lastErr.message.includes('timeout') || lastErr.message.includes('Timeout')) {
+          throw new Error('网络连接超时，请检查网络后重试');
+        }
+      }
+      throw lastErr;
+    }
+    throw new Error(`所有 API 域名请求均失败: ${path}`);
   }
 
   // ─── 搜索 ───
@@ -472,6 +574,27 @@ export class ApiService {
    * @returns 用户信息
    */
   async login(username: string, password: string): Promise<UserSession> {
+    // 确保已初始化（获取了初始 cookies）
+    await this.initialize();
+
+    // 关键检查：确保 AVS cookie 存在
+    let cookiesStr = HttpClient.getCookiesString();
+    if (!cookiesStr.includes('AVS=')) {
+      console.warn('[ApiService] ⚠ AVS cookie 丢失，重新初始化...');
+      // 清除所有 cookies 并重新初始化
+      HttpClient.clearAllCookies();
+      this.isInitialized = false;
+      this.initialCookies = '';
+      await this.initialize();
+      
+      // 再次检查
+      cookiesStr = HttpClient.getCookiesString();
+      if (!cookiesStr.includes('AVS=')) {
+        console.error('[ApiService] ✗ 重新初始化后仍未获取到 AVS cookie');
+        throw new Error('初始化失败，请检查网络连接');
+      }
+    }
+
     let ts = CryptoUtils.timestamp();
     let headers = await this.buildTokenHeaders(ts);
 
@@ -480,16 +603,47 @@ export class ApiService {
     bodyParams['password'] = password;
     let body = ApiService.buildFormBody(bodyParams);
 
+    console.info(`[ApiService] 准备登录, username=${username}, ts=${ts}`);
+    console.info(`[ApiService] 登录 headers: ${JSON.stringify(headers)}`);
+    console.info(`[ApiService] 登录 body: ${body}`);
+    console.info(`[ApiService] 当前 cookies: ${cookiesStr.substring(0, 100)}...`);
+    
     let respStr = await this.requestApi(API_LOGIN, 'POST', body, headers);
 
+    console.info(`[ApiService] 登录响应长度: ${respStr.length}, 完整响应: ${respStr}`);
+    
     // login 响应也是加密的（双层结构），需要解密
     let resp = await this.decryptResponse<JmUserData>(respStr, ts);
     if (resp.code !== 200) {
-      throw new Error(resp.message || '登录失败');
+      console.error(`[ApiService] 登录失败: code=${resp.code}, message=${resp.message}`);
+      
+      // 根据错误码提供更友好的提示
+      let errorMessage = '登录失败';
+      if (resp.code === 401 || resp.code === 403) {
+        errorMessage = '账号或密码错误，请检查后重试';
+      } else if (resp.code === 429) {
+        errorMessage = '请求过于频繁，请稍后再试';
+      } else if (resp.message && resp.message.length > 0) {
+        errorMessage = resp.message;
+      }
+      
+      throw new Error(errorMessage);
     }
 
-    this.userSession = UserSession.fromApiData(resp.data);
+    // 关键修复：从登录响应中提取 AVS cookie（参考 Python 项目实现）
+    // Python: cookies.update({'AVS': resp.res_data['s']})
+    let userData = resp.data as JmUserData;
+    if (userData.s && userData.s.length > 0) {
+      console.info(`[ApiService] 从登录响应中提取 AVS: ${userData.s.substring(0, 20)}...`);
+      // 强制更新 AVS cookie（使用 forceSetCookie 而不是 setCookie）
+      HttpClient.forceSetCookie('AVS', userData.s);
+    } else {
+      console.warn('[ApiService] ⚠ 登录响应中未找到 AVS (s 字段)');
+    }
+
+    this.userSession = UserSession.fromApiData(userData);
     console.info(`[ApiService] login success: uid=${this.userSession.uid}, username=${this.userSession.username}`);
+    AppStorage.setOrCreate('isLoggedIn', true);
     return this.userSession;
   }
 
@@ -512,6 +666,7 @@ export class ApiService {
    */
   logout(): void {
     this.userSession.logout();
+    AppStorage.setOrCreate('isLoggedIn', false);
     console.info('[ApiService] logout');
   }
 
@@ -608,6 +763,7 @@ export class ApiService {
     return {
       'token': tokenResult[0],
       'tokenparam': tokenResult[1],
+      'version': APP_VERSION,  // 添加 version header，登录等 POST 请求必需
     };
   }
 
