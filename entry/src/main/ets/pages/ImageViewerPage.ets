@@ -22,6 +22,39 @@ interface RouterParams {
   currentChapterIndex?: number;
 }
 
+// ── LazyForEach 数据源 ──
+class ImageDataSource implements IDataSource {
+  private images: JmImageInfo[] = [];
+  private listeners: DataChangeListener[] = [];
+
+  totalCount(): number {
+    return this.images.length;
+  }
+
+  getData(index: number): JmImageInfo {
+    return this.images[index];
+  }
+
+  registerDataChangeListener(listener: DataChangeListener): void {
+    if (this.listeners.indexOf(listener) < 0) {
+      this.listeners.push(listener);
+    }
+  }
+
+  unregisterDataChangeListener(listener: DataChangeListener): void {
+    let pos = this.listeners.indexOf(listener);
+    if (pos >= 0) {
+      this.listeners.splice(pos, 1);
+    }
+  }
+
+  /** 整体替换数据并触发全量刷新 */
+  reload(images: JmImageInfo[]): void {
+    this.images = images;
+    this.listeners.forEach(l => l.onDataReloaded());
+  }
+}
+
 @Entry
 @Component
 struct ImageViewerPage {
@@ -48,6 +81,7 @@ struct ImageViewerPage {
   private listScroller: Scroller = new Scroller();
   private decodingInFlight: boolean[] = [];
   private chapterGeneration: number = 0;
+  private imageDataSource: ImageDataSource = new ImageDataSource();
 
   aboutToAppear(): void {
     let params = router.getParams() as RouterParams;
@@ -105,6 +139,7 @@ struct ImageViewerPage {
 
       if (data && data.pictures && data.pictures.images) {
         this.images = data.pictures.images;
+        this.imageDataSource.reload(this.images);
         this.totalImages = this.images.length;
         this.titleText = data.pictures.name || this.titleText;
         if (data.pictures.scramble_id) {
@@ -164,6 +199,7 @@ struct ImageViewerPage {
     this.currentChapterIndex = index;
     this.currentVisibleIndex = 0;
     this.images = [];
+    this.imageDataSource.reload([]);
     this.decodedPixelMaps = [];
     this.decodingInFlight = [];
     this.totalImages = 0;
@@ -307,9 +343,9 @@ struct ImageViewerPage {
         .justifyContent(FlexAlign.Center)
         .backgroundColor('#1A1A1A')
       } else {
-        // 垂直滚动图片列表
+        // 垂直滚动图片列表（LazyForEach 懒加载，避免大量图片同时渲染）
         List({ scroller: this.listScroller }) {
-          ForEach(this.images, (img: JmImageInfo, index: number) => {
+          LazyForEach(this.imageDataSource, (img: JmImageInfo, index: number) => {
             ListItem() {
               if (this.decodedPixelMaps[index]) {
                 Image(this.decodedPixelMaps[index])
@@ -317,14 +353,14 @@ struct ImageViewerPage {
                   .objectFit(ImageFit.Contain)
               } else {
                 Column() {
-                  LoadingProgress()
-                    .width(40)
-                    .height(40)
-                    .color('#FF5A5F')
+                  Image($r('app.media.loading'))
+                    .width('100%')
+                    .height('100%')
+                    .objectFit(ImageFit.Contain)
                 }
                 .width('100%')
                 .justifyContent(FlexAlign.Center)
-                .backgroundColor('#1A1A1A')
+                .backgroundColor('#FFFFFF')
               }
             }
             .width('100%')
@@ -350,10 +386,9 @@ struct ImageViewerPage {
         // ── 悬浮顶部工具栏 ──
         if (this.showControls) {
           Row() {
-            Image($r('sys.symbol.chevron_left'))
-              .width(24)
-              .height(24)
-              .fillColor('#FFFFFF')
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(24)
+              .fontColor(['#FFFFFF'])
               .onClick(() => this.onBack())
 
             Text(this.titleText)
@@ -366,10 +401,9 @@ struct ImageViewerPage {
               .margin({ left: 8, right: 8 })
 
             // 占位保持标题居中
-            Image($r('sys.symbol.chevron_left'))
-              .width(24)
-              .height(24)
-              .fillColor('#00000000')
+            SymbolGlyph($r('sys.symbol.chevron_left'))
+              .fontSize(24)
+              .fontColor(['#00000000'])
           }
           .width('100%')
           .padding({ left: 12, right: 12, top: this.topSafeHeight + 8, bottom: 8 })

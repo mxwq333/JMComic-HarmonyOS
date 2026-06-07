@@ -260,10 +260,9 @@ struct AlbumCommentPage {
 
       // ── 顶部导航栏 ──
       Row() {
-        Image($r('sys.symbol.chevron_left'))
-          .width(24)
-          .height(24)
-          .fillColor('#333333')
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(24)
+          .fontColor(['#333333'])
           .onClick(() => this.onBack())
 
         Text(this.albumName)
@@ -276,10 +275,9 @@ struct AlbumCommentPage {
           .textOverflow({ overflow: TextOverflow.Ellipsis })
 
         // 占位保持对称
-        Image($r('sys.symbol.chevron_left'))
-          .width(24)
-          .height(24)
-          .fillColor(Color.Transparent)
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(24)
+          .fontColor([Color.Transparent])
       }
       .position({ x: 0, y: 0 })
       .width('100%')

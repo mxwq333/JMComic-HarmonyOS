@@ -277,10 +277,9 @@ struct AlbumDetailPage {
                 // 收藏按钮
                 Button({ type: ButtonType.Normal }) {
                   Row() {
-                    Image($r('sys.symbol.heart'))
-                      .width(16)
-                      .height(16)
-                      .fillColor('#FF5A5F')
+                    SymbolGlyph($r('sys.symbol.heart'))
+                      .fontSize(16)
+                      .fontColor(['#FF5A5F'])
                     Text(this.isFavorited ? '已收藏' : '收藏')
                       .fontSize(13)
                       .fontColor('#FF5A5F')
@@ -505,10 +504,9 @@ struct AlbumDetailPage {
                 .fontColor('#999999')
                 .margin({ right: 8 })
 
-              Image($r('sys.symbol.chevron_down'))
-                .width(16)
-                .height(16)
-                .fillColor('#999999')
+              SymbolGlyph($r('sys.symbol.chevron_down'))
+                .fontSize(16)
+                .fontColor(['#999999'])
                 .rotate({ angle: this.isChapterExpanded ? 180 : 0 })
             }
             .width('100%')
@@ -534,10 +532,9 @@ struct AlbumDetailPage {
                     .textOverflow({ overflow: TextOverflow.Ellipsis })
                     .margin({ left: 8 })
 
-                  Image($r('sys.symbol.chevron_right'))
-                    .width(16)
-                    .height(16)
-                    .fillColor('#CCCCCC')
+                  SymbolGlyph($r('sys.symbol.chevron_right'))
+                    .fontSize(16)
+                    .fontColor(['#CCCCCC'])
                 }
                 .width('100%')
                 .height(52)
@@ -618,10 +615,9 @@ struct AlbumDetailPage {
 
       // ── 沉浸式顶部导航栏（毛玻璃浮层） ──
       Row() {
-        Image($r('sys.symbol.chevron_left'))
-          .width(24)
-          .height(24)
-          .fillColor('#333333')
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(24)
+          .fontColor(['#333333'])
           .onClick(() => this.onBack())
 
         Text('详情')
@@ -633,10 +629,9 @@ struct AlbumDetailPage {
           .maxLines(1)
 
         // 占位保持对称
-        Image($r('sys.symbol.chevron_left'))
-          .width(24)
-          .height(24)
-          .fillColor(Color.Transparent)
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(24)
+          .fontColor([Color.Transparent])
       }
       .position({ x: 0, y: 0 })
       .width('100%')

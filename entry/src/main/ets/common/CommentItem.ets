@@ -117,10 +117,9 @@ export struct CommentItemComponent {
         // 点赞 + 回复数
         Row() {
           Row() {
-            Image($r('sys.symbol.heart'))
-              .width(14)
-              .height(14)
-              .fillColor('#999999')
+            SymbolGlyph($r('sys.symbol.heart'))
+              .fontSize(14)
+              .fontColor(['#999999'])
             Text(`${this.comment.like}`)
               .fontSize(12)
               .fontColor('#999999')
@@ -130,10 +129,9 @@ export struct CommentItemComponent {
 
           if (this.comment.subComments && this.comment.subComments.length > 0) {
             Row() {
-              Image($r('sys.symbol.quote'))
-                .width(14)
-                .height(14)
-                .fillColor('#999999')
+              SymbolGlyph($r('sys.symbol.quote'))
+                .fontSize(14)
+                .fontColor(['#999999'])
               Text(`${this.comment.subComments.length}`)
                 .fontSize(12)
                 .fontColor('#999999')
@@ -190,10 +188,9 @@ export struct CommentItemComponent {
         // 关联漫画
         if (this.comment.linkBookId && this.comment.linkBookName) {
           Row() {
-            Image($r('sys.symbol.book'))
-              .width(12)
-              .height(12)
-              .fillColor('#FF5A5F')
+            SymbolGlyph($r('sys.symbol.book'))
+              .fontSize(12)
+              .fontColor(['#FF5A5F'])
             Text(this.comment.linkBookName)
               .fontSize(11)
               .fontColor('#FF5A5F')

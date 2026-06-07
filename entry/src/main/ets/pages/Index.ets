@@ -16,7 +16,7 @@ import {
   ORDER_WEEK_RANKING, ORDER_DAY_RANKING, ORDER_BY_LIKE,
   ORDER_NAME_MAP, PAGE_SIZE_FAVORITE,
 } from '../common/Constants';
-import { HdsTabs, HdsTabsController, HdsTabsFloatingStyle, hdsMaterial } from '@kit.UIDesignKit';
+import { HdsTabs, HdsTabsController, hdsMaterial } from '@kit.UIDesignKit';
 import { MenuItem, buildMenuPopup, RouteColumn, buildRouteMenu, buildMenuOverlay } from '../common/MenuPopup';
 import { CommentItemComponent } from '../common/CommentItem';
 
@@ -449,10 +449,9 @@ struct ProfilePage {
           // ── 未登录状态 ──
 
           Row() {
-            Image($r('sys.symbol.person'))
-              .width(48)
-              .height(48)
-              .fillColor('#CCCCCC')
+            SymbolGlyph($r('sys.symbol.person'))
+              .fontSize(48)
+              .fontColor(['#CCCCCC'])
 
             Column() {
               Text('未登录')
@@ -468,10 +467,9 @@ struct ProfilePage {
             .margin({ left: 14 })
             .layoutWeight(1)
 
-            Image($r('sys.symbol.chevron_right'))
-              .width(20)
-              .height(20)
-              .fillColor('#CCCCCC')
+            SymbolGlyph($r('sys.symbol.chevron_right'))
+              .fontSize(20)
+              .fontColor(['#CCCCCC'])
           }
           .width('100%')
           .padding({ left: 20, right: 20, top: 24, bottom: 20 })
@@ -555,7 +553,7 @@ struct ProfilePage {
 }
 
 // ═══════════════════════════════════════════
-// 分类页（原 Index 内容）
+// 分类页
 // ═══════════════════════════════════════════
 @Component
 struct CategoryPage {
@@ -1095,6 +1093,8 @@ struct ForumPage {
   }
 }
 
+
+
 // ═══════════════════════════════════════════
 // 主入口 — HdsTabs 悬浮页签
 // ═══════════════════════════════════════════
@@ -1150,6 +1150,20 @@ struct Index {
     this.selectedImageIndex = index;
   }
 
+  @Builder TabBarBuilder(icon: Resource, label: string, index: number) {
+    Column() {
+      SymbolGlyph(icon)
+        .fontSize(24)
+        .fontColor([this.currentIndex === index ? '#007AFF' : '#8E8E93'])
+      Text(label)
+        .fontSize(10)
+        .fontColor(this.currentIndex === index ? '#007AFF' : '#8E8E93')
+    }
+    .padding({ top: 8, bottom: 4 })
+    .justifyContent(FlexAlign.Center)
+    .alignItems(HorizontalAlign.Center)
+  }
+
   build() {
     Stack() {
       // ── 全屏 HdsTabs（内容可延伸到顶部栏背后）──
@@ -1158,32 +1172,34 @@ struct Index {
         TabContent() {
           HomePage()
         }
-        .tabBar(new BottomTabBarStyle($r('sys.symbol.house'), '首页'))
+        .tabBar(this.TabBarBuilder($r('sys.symbol.house'), '首页', 0))
 
         // ── 分类 ──
         TabContent() {
           CategoryPage()
         }
-        .tabBar(new BottomTabBarStyle($r('sys.symbol.square_grid_2x2'), '分类'))
+        .tabBar(this.TabBarBuilder($r('sys.symbol.square_grid_2x2'), '分类', 1))
 
         // ── 讨论区 ──
         TabContent() {
           ForumPage()
         }
-        .tabBar(new BottomTabBarStyle($r('sys.symbol.message'), '讨论区'))
+        .tabBar(this.TabBarBuilder($r('sys.symbol.message'), '讨论区', 2))
 
         // ── 个人中心 ──
         TabContent() {
           ProfilePage()
         }
-        .tabBar(new BottomTabBarStyle($r('sys.symbol.person'), '个人中心'))
+        .tabBar(this.TabBarBuilder($r('sys.symbol.person'), '个人中心', 3))
       }
       .barPosition(BarPosition.End)
       .barOverlap(true)
       .barFloatingStyle({
-        barSideMargin: 16,
         barBottomMargin: 16,
-        barOpacity: 0.9,
+        systemMaterialEffect: {
+          materialType: hdsMaterial.MaterialType.IMMERSIVE,
+          materialLevel: hdsMaterial.MaterialLevel.EXQUISITE
+        }
       })
       .animationDuration(300)
       .scrollable(true)

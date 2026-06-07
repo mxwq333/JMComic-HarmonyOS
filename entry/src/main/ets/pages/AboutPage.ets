@@ -17,10 +17,9 @@ struct AboutPage {
       // ── 顶部栏 ──
       Row() {
         Button({ type: ButtonType.Normal }) {
-          Image($r('sys.symbol.chevron_left'))
-            .width(22)
-            .height(22)
-            .fillColor('#333333')
+          SymbolGlyph($r('sys.symbol.chevron_left'))
+            .fontSize(22)
+            .fontColor(['#333333'])
         }
         .backgroundColor(Color.Transparent)
         .width(36)

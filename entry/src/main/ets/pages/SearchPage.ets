@@ -174,10 +174,9 @@ struct SearchPage {
           .justifyContent(FlexAlign.Center)
         } else if (this.hasSearched && this.albums.length === 0) {
           Column() {
-            Image($r('sys.symbol.magnifyingglass'))
-              .width(48)
-              .height(48)
-              .fillColor('#CCCCCC')
+            SymbolGlyph($r('sys.symbol.magnifyingglass'))
+              .fontSize(48)
+              .fontColor(['#CCCCCC'])
             Text('未找到相关漫画')
               .fontSize(16)
               .fontColor('#999999')
@@ -231,10 +230,9 @@ struct SearchPage {
               .width('100%')
               .alignItems(HorizontalAlign.Start)
             } else {
-              Image($r('sys.symbol.magnifyingglass'))
-                .width(48)
-                .height(48)
-                .fillColor('#DDDDDD')
+              SymbolGlyph($r('sys.symbol.magnifyingglass'))
+                .fontSize(48)
+                .fontColor(['#DDDDDD'])
               Text('输入关键词搜索漫画')
                 .fontSize(15)
                 .fontColor('#BBBBBB')
@@ -299,26 +297,39 @@ struct SearchPage {
 
       // ── 搜索栏（浮层 + 毛玻璃） ──
       Row() {
-        Image($r('sys.symbol.chevron_left'))
-          .width(24)
-          .height(24)
-          .fillColor('#333333')
+        SymbolGlyph($r('sys.symbol.chevron_left'))
+          .fontSize(24)
+          .fontColor(['#333333'])
           .onClick(() => this.onBack())
 
-        TextInput({ placeholder: '输入关键词搜索...', text: this.keyword })
-          .layoutWeight(1)
-          .height(40)
-          .fontSize(15)
-          .backgroundColor('#F5F5F5')
-          .borderRadius(20)
-          .padding({ left: 16, right: 16 })
-          .margin({ left: 12, right: 12 })
-          .onChange((value: string) => {
-            this.keyword = value;
-          })
-          .onSubmit(() => {
-            this.doSearch();
-          })
+        Stack({ alignContent: Alignment.End }) {
+          TextInput({ placeholder: '输入关键词搜索...', text: this.keyword })
+            .width('100%')
+            .height(40)
+            .fontSize(15)
+            .backgroundColor('#F5F5F5')
+            .borderRadius(20)
+            .padding({ left: 16, right: 36 })
+            .onChange((value: string) => {
+              this.keyword = value;
+            })
+            .onSubmit(() => {
+              this.doSearch();
+            })
+
+          if (this.keyword.trim().length > 0) {
+            // 推荐写法：使用 SymbolGlyph
+            SymbolGlyph($r('sys.symbol.xmark_circle_fill'))
+              .fontSize(18)                 // 对应之前的 .width() .height()
+              .fontColor(['#B3B3B3'])       // 注意：fontColor 接收数组
+              .margin({ right: 13 })
+              .onClick(() => {
+                this.keyword = '';
+              })
+          }
+        }
+        .layoutWeight(1)
+        .margin({ left: 12, right: 12 })
 
         Text('搜索')
           .fontSize(15)
